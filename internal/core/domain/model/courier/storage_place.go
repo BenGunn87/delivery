@@ -76,8 +76,8 @@ func (storage *StoragePlace) Equal(other *StoragePlace) bool {
 	return storage.baseEntity.Equal(other.baseEntity)
 }
 
-func (storage *StoragePlace) CanOrderBePlace(order *order.Order) bool {
-	err := storage.checkCanBePlace(order)
+func (storage *StoragePlace) CanOrderBePlace(orderVolume model.Volume) bool {
+	err := storage.checkCanBePlace(orderVolume)
 	if err != nil {
 		return false
 	}
@@ -85,13 +85,16 @@ func (storage *StoragePlace) CanOrderBePlace(order *order.Order) bool {
 	return true
 }
 
-func (storage *StoragePlace) PlaceOrder(order *order.Order) error {
-	err := storage.checkCanBePlace(order)
+func (storage *StoragePlace) PlaceOrder(orderId uuid.UUID, orderVolume model.Volume) error {
+	if orderId == uuid.Nil {
+		return errs.NewValueIsRequired("orderId")
+	}
+
+	err := storage.checkCanBePlace(orderVolume)
 	if err != nil {
 		return err
 	}
 
-	orderId := order.Id()
 	storage.orderId = &orderId
 
 	return nil
@@ -112,15 +115,12 @@ func (storage *StoragePlace) IsEmpty() bool {
 	return storage.orderId == nil
 }
 
-func (storage *StoragePlace) checkCanBePlace(order *order.Order) error {
-	if order == nil {
-		return errs.NewValueIsRequired("order")
-	}
+func (storage *StoragePlace) checkCanBePlace(orderVolume model.Volume) error {
 	if storage.orderId != nil {
 		return ErrStorageIsAlreadyTaken
 	}
 
-	if storage.totalVolume.LessThen(order.Volume()) {
+	if storage.totalVolume.LessThen(orderVolume) {
 		return ErrOrderVolumeIsTooLarge
 	}
 
