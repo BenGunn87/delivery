@@ -4,12 +4,20 @@ import (
 	"delivery/internal/core/domain/model"
 	"delivery/internal/pkg/ddd"
 	"delivery/internal/pkg/errs"
+	"errors"
 	"github.com/google/uuid"
+)
+
+var (
+	ErrStatusIsNotCreated  = errors.New("order status must be Created")
+	ErrStatusIsNotAssigned = errors.New("order status must be Assigned")
 )
 
 type Order struct {
 	baseAggregate *ddd.BaseAggregate[uuid.UUID]
 	volume        model.Volume
+	status        Status
+	courierId     *uuid.UUID
 }
 
 func NewOrder(id uuid.UUID, volume model.Volume) (*Order, error) {
@@ -20,6 +28,8 @@ func NewOrder(id uuid.UUID, volume model.Volume) (*Order, error) {
 	return &Order{
 		baseAggregate: ddd.NewBaseAggregate(id),
 		volume:        volume,
+		status:        StatusCreated,
+		courierId:     nil,
 	}, nil
 }
 
@@ -37,4 +47,39 @@ func (order *Order) Equal(other *Order) bool {
 	}
 
 	return order.baseAggregate.Equal(other.baseAggregate)
+}
+
+func (order *Order) Status() Status {
+	return order.status
+}
+
+func (order *Order) CourierId() *uuid.UUID {
+	if order.courierId == nil {
+		return nil
+	}
+
+	courierId := *order.courierId
+	return &courierId
+}
+
+func (order *Order) Assigned(courierId uuid.UUID) error {
+	if courierId == uuid.Nil {
+		return errs.NewValueIsRequired("courierId")
+	}
+
+	if order.status != StatusCreated {
+		return ErrStatusIsNotCreated
+	}
+	order.status = StatusAssigned
+	order.courierId = &courierId
+	return nil
+}
+
+func (order *Order) Completed() error {
+	if order.status != StatusAssigned {
+		return ErrStatusIsNotAssigned
+	}
+	order.status = StatusCompleted
+	order.courierId = nil
+	return nil
 }

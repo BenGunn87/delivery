@@ -17,6 +17,8 @@ func Test_OrderBeCorrectWhenParamsAreCorrectOnCreate(t *testing.T) {
 	assert.NotEmpty(t, order)
 	assert.Equal(t, order.Id(), id)
 	assert.Equal(t, order.Volume(), volume)
+	assert.Equal(t, order.Status(), StatusCreated)
+	assert.Empty(t, order.CourierId())
 }
 
 func Test_OrderReturnErrorWhenOrderIdIsNil(t *testing.T) {
@@ -27,5 +29,70 @@ func Test_OrderReturnErrorWhenOrderIdIsNil(t *testing.T) {
 
 	if err.Error() != expected.Error() {
 		t.Errorf("expected %v, got %v", expected, err)
+	}
+}
+
+func Test_OrderCanBeAssignedWhenItCreated(t *testing.T) {
+	// Arrange
+	id := uuid.MustParse("ec85ceee-f186-4e9c-a4dd-2929e69e586c")
+	courierId := uuid.MustParse("ec58ceee-f186-4e9c-a4dd-2929e69e586c")
+	volume, _ := model.NewVolume(uint16(10))
+	order, _ := NewOrder(id, volume)
+
+	// Act
+	err := order.Assigned(courierId)
+
+	// Assert
+	assert.NoError(t, err)
+	assert.Equal(t, *order.CourierId(), courierId)
+	assert.Equal(t, order.Status(), StatusAssigned)
+}
+
+func Test_OrderAssignedReturnErrorWhenOrderStatusIsWrong(t *testing.T) {
+	// Arrange
+	id := uuid.MustParse("ec85ceee-f186-4e9c-a4dd-2929e69e586c")
+	courierId := uuid.MustParse("ec58ceee-f186-4e9c-a4dd-2929e69e586c")
+	volume, _ := model.NewVolume(uint16(10))
+	order, _ := NewOrder(id, volume)
+	_ = order.Assigned(courierId)
+
+	// Act
+	err := order.Assigned(courierId)
+
+	// Assert
+	if err.Error() != ErrStatusIsNotCreated.Error() {
+		t.Errorf("expected %v, got %v", ErrStatusIsNotCreated, err)
+	}
+}
+
+func Test_OrderCanBeCompletedWhenItAssigned(t *testing.T) {
+	// Arrange
+	id := uuid.MustParse("ec85ceee-f186-4e9c-a4dd-2929e69e586c")
+	courierId := uuid.MustParse("ec58ceee-f186-4e9c-a4dd-2929e69e586c")
+	volume, _ := model.NewVolume(uint16(10))
+	order, _ := NewOrder(id, volume)
+	_ = order.Assigned(courierId)
+
+	// Act
+	err := order.Completed()
+
+	// Assert
+	assert.NoError(t, err)
+	assert.Empty(t, order.CourierId())
+	assert.Equal(t, order.Status(), StatusCompleted)
+}
+
+func Test_OrderCompletedReturnErrorWhenOrderStatusIsWrong(t *testing.T) {
+	// Arrange
+	id := uuid.MustParse("ec85ceee-f186-4e9c-a4dd-2929e69e586c")
+	volume, _ := model.NewVolume(uint16(10))
+	order, _ := NewOrder(id, volume)
+
+	// Act
+	err := order.Completed()
+
+	// Assert
+	if err.Error() != ErrStatusIsNotAssigned.Error() {
+		t.Errorf("expected %v, got %v", ErrStatusIsNotAssigned, err)
 	}
 }

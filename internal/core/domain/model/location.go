@@ -1,6 +1,9 @@
 package model
 
-import "delivery/internal/pkg/errs"
+import (
+	"delivery/internal/pkg/errs"
+	"math"
+)
 
 const (
 	minCoordinateValue = 1
@@ -50,15 +53,8 @@ func (l Location) Equal(other Location) bool {
 }
 
 func (l Location) Distance(other Location) uint8 {
-	distanceX := l.x - other.x
-	distanceY := l.y - other.y
+	distanceX := math.Abs(float64(l.x) - float64(other.x))
+	distanceY := math.Abs(float64(l.y) - float64(other.y))
 
-	if distanceX < 0 {
-		distanceX = -distanceX
-	}
-	if distanceY < 0 {
-		distanceY = -distanceY
-	}
-
-	return distanceX + distanceY
+	return uint8(distanceX + distanceY)
 }
