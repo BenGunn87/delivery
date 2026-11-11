@@ -33,7 +33,7 @@ func NewOrder(id uuid.UUID, volume model.Volume) (*Order, error) {
 	}, nil
 }
 
-func (order *Order) Id() uuid.UUID {
+func (order *Order) ID() uuid.UUID {
 	return order.baseAggregate.ID()
 }
 
@@ -62,7 +62,7 @@ func (order *Order) CourierId() *uuid.UUID {
 	return &courierId
 }
 
-func (order *Order) Assigned(courierId uuid.UUID) error {
+func (order *Order) MarkAsAssigned(courierId uuid.UUID) error {
 	if courierId == uuid.Nil {
 		return errs.NewValueIsRequired("courierId")
 	}
@@ -75,7 +75,7 @@ func (order *Order) Assigned(courierId uuid.UUID) error {
 	return nil
 }
 
-func (order *Order) Completed() error {
+func (order *Order) MarkAsCompleted() error {
 	if order.status != StatusAssigned {
 		return ErrStatusIsNotAssigned
 	}

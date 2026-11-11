@@ -20,25 +20,22 @@ func standardOrderWithVolume10() *order.Order {
 }
 
 func Test_StoragePlaceBeCorrectWhenParamsAreCorrectOnCreated(t *testing.T) {
-	expectedOrder := standardOrderWithVolume10()
-	expectedOrderId := expectedOrder.Id()
 	volume, _ := model.NewVolume(uint16(20))
 
 	name := "BackPack"
-	storage, err := NewStoragePlace(name, volume, expectedOrder)
+	storage, err := NewStoragePlace(name, volume)
 
 	assert.NoError(t, err)
 	assert.NotEmpty(t, storage)
 	assert.Equal(t, name, storage.Name())
 	assert.Equal(t, volume, storage.TotalVolume())
-	assert.Equal(t, &(expectedOrderId), storage.OrderId())
 }
 
 func Test_StoragePlaceBeCorrectEmptyWhenOrderNotSpecifiedOnCreated(t *testing.T) {
 	volume, _ := model.NewVolume(uint16(20))
 
 	name := "BackPack"
-	storage, err := NewStoragePlace(name, volume, nil)
+	storage, err := NewStoragePlace(name, volume)
 
 	assert.NoError(t, err)
 	assert.NotEmpty(t, storage)
@@ -62,19 +59,12 @@ func Test_StoragePlaceReturnErrorWhenParamsAreNotCorrectOnCreated(t *testing.T) 
 			volume:      20,
 			expectedErr: errs.NewValueIsRequired("name"),
 		},
-		"order_volume_is_too_large": {
-			name:        "BackPack",
-			order:       expectedOrder,
-			volume:      5,
-			expectedErr: ErrOrderVolumeIsTooLarge,
-		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			volume, _ := model.NewVolume(test.volume)
-
-			_, err := NewStoragePlace(test.name, volume, test.order)
+			_, err := NewStoragePlace(test.name, volume)
 			if err.Error() != test.expectedErr.Error() {
 				t.Errorf("expected %v, got %v", test.expectedErr, err)
 			}
@@ -84,7 +74,7 @@ func Test_StoragePlaceReturnErrorWhenParamsAreNotCorrectOnCreated(t *testing.T) 
 
 func Test_StoragePlaceShouldBeEqualWhenIdIsSame(t *testing.T) {
 	volume, _ := model.NewVolume(10)
-	storage, _ := NewStoragePlace("BackPack", volume, nil)
+	storage, _ := NewStoragePlace("BackPack", volume)
 
 	isEqual := storage.Equal(storage)
 
@@ -94,8 +84,8 @@ func Test_StoragePlaceShouldBeEqualWhenIdIsSame(t *testing.T) {
 func Test_StoragePlaceShouldBeNotEqualWhenIdIsNotSame(t *testing.T) {
 	volume, _ := model.NewVolume(10)
 	name := "BackPack"
-	storage1, _ := NewStoragePlace(name, volume, nil)
-	storage2, _ := NewStoragePlace(name, volume, nil)
+	storage1, _ := NewStoragePlace(name, volume)
+	storage2, _ := NewStoragePlace(name, volume)
 
 	isEqual := storage1.Equal(storage2)
 
@@ -143,11 +133,10 @@ func Test_StoragePlaceCorrectlyDeterminesPossibilityPlacingOrder(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			volume, _ := model.NewVolume(test.volume)
-			var initOrder *order.Order = nil
+			storagePlace, _ := NewStoragePlace(test.name, volume)
 			if test.initOrderId != nil {
-				initOrder, _ = order.NewOrder(*test.initOrderId, test.orderVolume)
+				_ = storagePlace.placeOrder(*test.initOrderId, orderVolume)
 			}
-			storagePlace, _ := NewStoragePlace(test.name, volume, initOrder)
 			res := storagePlace.CanOrderBePlace(test.orderVolume)
 
 			assert.Equal(t, test.expectedResult, res)
@@ -158,10 +147,10 @@ func Test_StoragePlaceCorrectlyDeterminesPossibilityPlacingOrder(t *testing.T) {
 func Test_StoragePlaceCanBeUseWhenEmptyAndVolumeSufficient(t *testing.T) {
 	volume, _ := model.NewVolume(10)
 	name := "BackPack"
-	storage, _ := NewStoragePlace(name, volume, nil)
+	storage, _ := NewStoragePlace(name, volume)
 	orderId := uuid.MustParse("67dda004-f324-4868-af9a-88f77d1d28fc")
 
-	err := storage.PlaceOrder(orderId, volume)
+	err := storage.placeOrder(orderId, volume)
 
 	assert.NoError(t, err)
 }
@@ -199,13 +188,11 @@ func Test_StoragePlaceReturnErrorWhenParamsAreNotCorrectOnPlaceOrder(t *testing.
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			volume, _ := model.NewVolume(test.volume)
-			var initOrder *order.Order = nil
+			storagePlace, _ := NewStoragePlace(test.name, volume)
 			if test.initOrderId != nil {
-				initOrder, _ = order.NewOrder(*test.initOrderId, *test.orderVolume)
+				_ = storagePlace.placeOrder(*test.initOrderId, *test.orderVolume)
 			}
-
-			storagePlace, _ := NewStoragePlace(test.name, volume, initOrder)
-			err := storagePlace.PlaceOrder(*test.placedOrderId, *test.orderVolume)
+			err := storagePlace.placeOrder(*test.placedOrderId, *test.orderVolume)
 
 			if err.Error() != test.expectedErr.Error() {
 				t.Errorf("expected %v, got %v", test.expectedErr, err)
@@ -216,20 +203,20 @@ func Test_StoragePlaceReturnErrorWhenParamsAreNotCorrectOnPlaceOrder(t *testing.
 
 func Test_StoragePlaceShouldReturnOrderWhenNotEmpty(t *testing.T) {
 	volume, _ := model.NewVolume(10)
-	storage, _ := NewStoragePlace("BackPack", volume, nil)
+	storage, _ := NewStoragePlace("BackPack", volume)
 	orderId := uuid.MustParse("67dda004-f324-4868-af9a-88f77d1d28fc")
 
-	_ = storage.PlaceOrder(orderId, volume)
+	_ = storage.placeOrder(orderId, volume)
 
-	result, _ := storage.RetrieveOrder()
-	assert.Equal(t, orderId, *result)
+	result, _ := storage.retrieveOrder()
+	assert.Equal(t, orderId, result)
 	assert.Equal(t, true, storage.IsEmpty())
 }
 
 func Test_StoragePlaceReturnErrorWhenItEmptyOnRetrieveOrder(t *testing.T) {
 	volume, _ := model.NewVolume(10)
-	storage, _ := NewStoragePlace("BackPack", volume, nil)
+	storage, _ := NewStoragePlace("BackPack", volume)
 
-	_, err := storage.RetrieveOrder()
+	_, err := storage.retrieveOrder()
 	assert.ErrorIs(t, ErrStorageIsEmpty, err)
 }

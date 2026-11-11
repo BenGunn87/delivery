@@ -11,11 +11,11 @@ const (
 )
 
 type Location struct {
-	x uint8
-	y uint8
+	x int
+	y int
 }
 
-func NewLocation(x uint8, y uint8) (Location, error) {
+func NewLocation(x int, y int) (Location, error) {
 	if x < minCoordinateValue || x > maxCoordinateValue {
 		return Location{}, errs.NewMustBeBetween(
 			"x",
@@ -40,11 +40,11 @@ func NewLocation(x uint8, y uint8) (Location, error) {
 	}, nil
 }
 
-func (l Location) X() uint8 {
+func (l Location) X() int {
 	return l.x
 }
 
-func (l Location) Y() uint8 {
+func (l Location) Y() int {
 	return l.y
 }
 
@@ -52,9 +52,9 @@ func (l Location) Equal(other Location) bool {
 	return l == other
 }
 
-func (l Location) Distance(other Location) uint8 {
+func (l Location) Distance(other Location) int {
 	distanceX := math.Abs(float64(l.x) - float64(other.x))
 	distanceY := math.Abs(float64(l.y) - float64(other.y))
 
-	return uint8(distanceX + distanceY)
+	return int(distanceX + distanceY)
 }

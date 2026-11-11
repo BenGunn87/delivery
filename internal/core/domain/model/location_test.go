@@ -7,8 +7,8 @@ import (
 )
 
 func Test_LocationBeCorrectWhenParamsAreCorrectOnCreated(t *testing.T) {
-	expectedX := uint8(1)
-	expectedY := uint8(2)
+	expectedX := 1
+	expectedY := 2
 
 	location, err := NewLocation(expectedX, expectedY)
 
@@ -21,8 +21,8 @@ func Test_LocationBeCorrectWhenParamsAreCorrectOnCreated(t *testing.T) {
 func Test_LocationReturnErrorWhenParamsAreInCorrectOnCreated(t *testing.T) {
 	// Arrange
 	tests := map[string]struct {
-		x        uint8
-		y        uint8
+		x        int
+		y        int
 		expected error
 	}{
 		"x 0": {

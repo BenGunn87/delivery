@@ -2,7 +2,6 @@ package courier
 
 import (
 	"delivery/internal/core/domain/model"
-	"delivery/internal/core/domain/model/order"
 	"delivery/internal/pkg/ddd"
 	"delivery/internal/pkg/errs"
 	"errors"
@@ -11,50 +10,58 @@ import (
 )
 
 var (
-	ErrOrderCannotBeTaken      = errors.New("order cannot be taken")
-	ErrOrderNoFoundWithCourier = errors.New("order not fount with the courier")
+	ErrOrderCannotBeTaken       = errors.New("order cannot be taken")
+	ErrOrderNotFoundWithCourier = errors.New("order not found with the courier")
 )
 
 type Courier struct {
 	baseAggregate *ddd.BaseAggregate[uuid.UUID]
 	name          string
-	speed         uint8
+	speed         model.Speed
 	location      model.Location
 	storagePlaces []*StoragePlace
 }
 
-func NewDefaultBag() *StoragePlace {
+func newDefaultBag() *StoragePlace {
 	volume, _ := model.NewVolume(10)
-	defaultBag, _ := NewStoragePlace("Bag", volume, nil)
+	defaultBag, _ := NewStoragePlace("Bag", volume)
 	return defaultBag
 }
 
-func NewCourier(name string, speed uint8, location model.Location) (*Courier, error) {
+func NewCourier(name string, speed int, location model.Location) (*Courier, error) {
 	if name == "" {
 		return nil, errs.NewValueIsRequired("name")
 	}
-	if speed == 0 {
-		return nil, errs.NewValueMustBeGreaterThan("speed", speed, 0)
+
+	s, err := model.NewSpeed(speed)
+	if err != nil {
+		return nil, err
 	}
 
 	return &Courier{
 		baseAggregate: ddd.NewBaseAggregate(uuid.New()),
 		name:          name,
-		speed:         speed,
+		speed:         s,
 		location:      location,
-		storagePlaces: []*StoragePlace{NewDefaultBag()},
+		storagePlaces: []*StoragePlace{newDefaultBag()},
 	}, nil
 }
 
-func (c *Courier) Id() uuid.UUID { return c.baseAggregate.ID() }
+func (c *Courier) ID() uuid.UUID { return c.baseAggregate.ID() }
 
 func (c *Courier) Name() string { return c.name }
 
-func (c *Courier) Speed() uint8 { return c.speed }
+func (c *Courier) Speed() model.Speed { return c.speed }
 
 func (c *Courier) Location() model.Location { return c.location }
 
-func (c *Courier) StoragePlaces() []*StoragePlace { return c.storagePlaces }
+func (c *Courier) StoragePlaces() []StoragePlace {
+	res := make([]StoragePlace, len(c.storagePlaces))
+	for i, storagePlace := range c.storagePlaces {
+		res[i] = *storagePlace
+	}
+	return res
+}
 
 func (c *Courier) Equal(other *Courier) bool {
 	if other == nil {
@@ -64,12 +71,9 @@ func (c *Courier) Equal(other *Courier) bool {
 	return c.baseAggregate.Equal(other.baseAggregate)
 }
 
-func (c *Courier) AddStoragePlace(name string, value uint16) error {
-	val, err := model.NewVolume(value)
-	if err != nil {
-		return err
-	}
-	storagePlace, err := NewStoragePlace(name, val, nil)
+func (c *Courier) AddStoragePlace(name string, value model.Volume) error {
+
+	storagePlace, err := NewStoragePlace(name, value)
 	if err != nil {
 		return err
 	}
@@ -78,10 +82,9 @@ func (c *Courier) AddStoragePlace(name string, value uint16) error {
 	return nil
 }
 
-func (c *Courier) CanTakeOrder(o order.Order) bool {
-	orderVolume := o.Volume()
+func (c *Courier) CanTakeOrderWithVolume(volume model.Volume) bool {
 	for _, storagePlace := range c.storagePlaces {
-		if storagePlace.CanOrderBePlace(orderVolume) {
+		if storagePlace.CanOrderBePlace(volume) {
 			return true
 		}
 	}
@@ -89,17 +92,11 @@ func (c *Courier) CanTakeOrder(o order.Order) bool {
 	return false
 }
 
-func (c *Courier) TakeOrder(o *order.Order) error {
-	orderVolume := o.Volume()
+func (c *Courier) TakeOrder(orderId uuid.UUID, orderVolume model.Volume) error {
 
 	for _, storagePlace := range c.storagePlaces {
 		if storagePlace.CanOrderBePlace(orderVolume) {
-			err := o.Assigned(c.Id())
-			if err != nil {
-				return err
-			}
-
-			err = storagePlace.PlaceOrder(o.Id(), orderVolume)
+			err := storagePlace.placeOrder(orderId, orderVolume)
 			if err != nil {
 				return err
 			}
@@ -111,15 +108,14 @@ func (c *Courier) TakeOrder(o *order.Order) error {
 	return ErrOrderCannotBeTaken
 }
 
-func (c *Courier) CompleteOrder(o *order.Order) error {
-	for _, storagePlace := range c.storagePlaces {
-		if storagePlace.OrderId() != nil && *storagePlace.OrderId() == o.Id() {
-			err := o.Completed()
-			if err != nil {
-				return err
-			}
+func (c *Courier) CompleteOrder(orderId uuid.UUID) error {
+	if orderId == uuid.Nil {
+		return errs.NewValueIsRequired("orderId")
+	}
 
-			_, err = storagePlace.RetrieveOrder()
+	for _, storagePlace := range c.storagePlaces {
+		if storagePlace.OrderId() == orderId {
+			_, err := storagePlace.retrieveOrder()
 			if err != nil {
 				return err
 			}
@@ -128,12 +124,14 @@ func (c *Courier) CompleteOrder(o *order.Order) error {
 		}
 	}
 
-	return ErrOrderNoFoundWithCourier
+	return ErrOrderNotFoundWithCourier
 }
 
-func (c *Courier) GetStepCount(target model.Location) uint8 {
-	steps := c.location.Distance(target) / c.Speed()
-	if c.location.Distance(target)%c.Speed() != 0 {
+func (c *Courier) GetStepCount(target model.Location) int {
+	speed := c.speed.Speed()
+	distance := c.location.Distance(target)
+	steps := distance / speed
+	if distance%speed != 0 {
 		steps++
 	}
 
@@ -143,7 +141,8 @@ func (c *Courier) GetStepCount(target model.Location) uint8 {
 func (c *Courier) Move(target model.Location) error {
 	dx := float64(target.X()) - float64(c.location.X())
 	dy := float64(target.Y()) - float64(c.location.Y())
-	remainingRange := float64(c.speed)
+
+	remainingRange := float64(c.speed.Speed())
 
 	if math.Abs(dx) > remainingRange {
 		dx = math.Copysign(remainingRange, dx)
@@ -154,8 +153,8 @@ func (c *Courier) Move(target model.Location) error {
 		dy = math.Copysign(remainingRange, dy)
 	}
 
-	newX := c.location.X() + uint8(dx)
-	newY := c.location.Y() + uint8(dy)
+	newX := c.location.X() + int(dx)
+	newY := c.location.Y() + int(dy)
 
 	newLocation, err := model.NewLocation(newX, newY)
 	if err != nil {

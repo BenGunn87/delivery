@@ -15,7 +15,7 @@ func Test_OrderBeCorrectWhenParamsAreCorrectOnCreate(t *testing.T) {
 	order, err := NewOrder(id, volume)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, order)
-	assert.Equal(t, order.Id(), id)
+	assert.Equal(t, order.ID(), id)
 	assert.Equal(t, order.Volume(), volume)
 	assert.Equal(t, order.Status(), StatusCreated)
 	assert.Empty(t, order.CourierId())
@@ -40,7 +40,7 @@ func Test_OrderCanBeAssignedWhenItCreated(t *testing.T) {
 	order, _ := NewOrder(id, volume)
 
 	// Act
-	err := order.Assigned(courierId)
+	err := order.MarkAsAssigned(courierId)
 
 	// Assert
 	assert.NoError(t, err)
@@ -54,10 +54,10 @@ func Test_OrderAssignedReturnErrorWhenOrderStatusIsWrong(t *testing.T) {
 	courierId := uuid.MustParse("ec58ceee-f186-4e9c-a4dd-2929e69e586c")
 	volume, _ := model.NewVolume(uint16(10))
 	order, _ := NewOrder(id, volume)
-	_ = order.Assigned(courierId)
+	_ = order.MarkAsAssigned(courierId)
 
 	// Act
-	err := order.Assigned(courierId)
+	err := order.MarkAsAssigned(courierId)
 
 	// Assert
 	if err.Error() != ErrStatusIsNotCreated.Error() {
@@ -71,10 +71,10 @@ func Test_OrderCanBeCompletedWhenItAssigned(t *testing.T) {
 	courierId := uuid.MustParse("ec58ceee-f186-4e9c-a4dd-2929e69e586c")
 	volume, _ := model.NewVolume(uint16(10))
 	order, _ := NewOrder(id, volume)
-	_ = order.Assigned(courierId)
+	_ = order.MarkAsAssigned(courierId)
 
 	// Act
-	err := order.Completed()
+	err := order.MarkAsCompleted()
 
 	// Assert
 	assert.NoError(t, err)
@@ -89,7 +89,7 @@ func Test_OrderCompletedReturnErrorWhenOrderStatusIsWrong(t *testing.T) {
 	order, _ := NewOrder(id, volume)
 
 	// Act
-	err := order.Completed()
+	err := order.MarkAsCompleted()
 
 	// Assert
 	if err.Error() != ErrStatusIsNotAssigned.Error() {
