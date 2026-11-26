@@ -2,7 +2,6 @@ package courier
 
 import (
 	"delivery/internal/core/domain/model"
-	"delivery/internal/core/domain/model/order"
 	"delivery/internal/pkg/ddd"
 	"delivery/internal/pkg/errs"
 	"errors"
@@ -19,30 +18,19 @@ type StoragePlace struct {
 	baseEntity  *ddd.BaseEntity[uuid.UUID]
 	name        string
 	totalVolume model.Volume
-	orderId     *uuid.UUID
+	orderId     uuid.UUID
 }
 
-func NewStoragePlace(name string, totalVolume model.Volume, order *order.Order) (*StoragePlace, error) {
+func NewStoragePlace(name string, totalVolume model.Volume) (*StoragePlace, error) {
 	if name == "" {
 		return nil, errs.NewValueIsRequired("name")
-	}
-	var orderId *uuid.UUID
-
-	if order != nil {
-		if totalVolume.LessThen(order.Volume()) {
-			return nil, ErrOrderVolumeIsTooLarge
-		}
-		id := order.Id()
-		orderId = &(id)
-	} else {
-		orderId = nil
 	}
 
 	return &StoragePlace{
 		baseEntity:  ddd.NewBaseEntity(uuid.New()),
 		name:        name,
 		totalVolume: totalVolume,
-		orderId:     orderId,
+		orderId:     uuid.Nil,
 	}, nil
 }
 
@@ -58,14 +46,8 @@ func (storage *StoragePlace) TotalVolume() model.Volume {
 	return storage.totalVolume
 }
 
-func (storage *StoragePlace) OrderId() *uuid.UUID {
-	if storage.orderId == nil {
-		return nil
-	}
-
-	orderId := *storage.orderId
-	return &orderId
-
+func (storage *StoragePlace) OrderId() uuid.UUID {
+	return storage.orderId
 }
 
 func (storage *StoragePlace) Equal(other *StoragePlace) bool {
@@ -78,14 +60,10 @@ func (storage *StoragePlace) Equal(other *StoragePlace) bool {
 
 func (storage *StoragePlace) CanOrderBePlace(orderVolume model.Volume) bool {
 	err := storage.checkCanBePlace(orderVolume)
-	if err != nil {
-		return false
-	}
-
-	return true
+	return err == nil
 }
 
-func (storage *StoragePlace) PlaceOrder(orderId uuid.UUID, orderVolume model.Volume) error {
+func (storage *StoragePlace) placeOrder(orderId uuid.UUID, orderVolume model.Volume) error {
 	if orderId == uuid.Nil {
 		return errs.NewValueIsRequired("orderId")
 	}
@@ -95,28 +73,28 @@ func (storage *StoragePlace) PlaceOrder(orderId uuid.UUID, orderVolume model.Vol
 		return err
 	}
 
-	storage.orderId = &orderId
+	storage.orderId = orderId
 
 	return nil
 }
 
-func (storage *StoragePlace) RetrieveOrder() (*uuid.UUID, error) {
+func (storage *StoragePlace) retrieveOrder() (uuid.UUID, error) {
 	if storage.IsEmpty() {
-		return nil, ErrStorageIsEmpty
+		return uuid.Nil, ErrStorageIsEmpty
 	}
 
 	orderId := storage.orderId
-	storage.orderId = nil
+	storage.orderId = uuid.Nil
 
 	return orderId, nil
 }
 
 func (storage *StoragePlace) IsEmpty() bool {
-	return storage.orderId == nil
+	return storage.orderId == uuid.Nil
 }
 
 func (storage *StoragePlace) checkCanBePlace(orderVolume model.Volume) error {
-	if storage.orderId != nil {
+	if storage.orderId != uuid.Nil {
 		return ErrStorageIsAlreadyTaken
 	}
 
